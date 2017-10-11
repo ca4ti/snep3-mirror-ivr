@@ -75,6 +75,7 @@ class IVR extends PBX_Rule_Action {
      */
     public function getConfig() {
         $userentry = (isset($this->config['userentry']))?"<value>{$this->config['userentry']}</value>":"";
+        $allow_exten_dial = (isset($this->config['allow_exten_dial']))?"<value>{$this->config['allow_exten_dial']}</value>":"";
         $finalflow = (isset($this->config['finalflow']))?"<value>{$this->config['finalflow']}</value>":"";
         $file = (isset($this->config['file']))?"<value>{$this->config['file']}</value>":"";
         $prefix = (isset($this->config['prefix']))?"<value>{$this->config['prefix']}</value>":"";
@@ -86,6 +87,7 @@ class IVR extends PBX_Rule_Action {
         $menu = array(
           "audio_file" => $this->i18n->translate('Menu Audio File'),
           "userentry" => $this->i18n->translate('Wait for user input'),
+          "allow_exten_dial" => $this->i18n->translate('Allow forward to an Extension'),
           "prefix" => $this->i18n->translate('IVR Prefix String - used to identify the next steps on IVR process'),
           "wait_time" => $this->i18n->translate('Wait for how long - in seconds'),
           "wait_digits" => $this->i18n->translate('Wait for which digits - split by ","'),
@@ -111,6 +113,12 @@ class IVR extends PBX_Rule_Action {
         <default></default>
         $prefix
     </string>
+    <boolean>
+    	<id>allow_exten_dial</id>
+    	<default>false</default>
+    	<label>{$menu['allow_exten_dial']}</label>
+	     $allow_exten_dial
+    </boolean>
     <int>
         <label>{$menu['wait_time']}</label>
         <id>timeout</id>
@@ -170,18 +178,28 @@ XML;
           $prefix = "";
         }
 
-        $log->info("Waiting for digits: {$this->config['digits']}");
+        if($this->config['allow_exten_dial'] == "true"){
+          $conf = Zend_Registry::get('config');
+          $maxdigits = $conf->canais->peers_digits;
+        }else{
+          $maxdigits = 1;
+        }
 
+        $log->info("Waiting for $maxdigits digits in: {$this->config['digits']} and {$this->config['allow_exten_dial']}");
 
         while($loop > 0){
           if($this->config['userentry'] == "true"){
               $interaction++;
-              $userinput_row = $asterisk->get_data($this->config['file'],$this->config['timeout']*1000,$this->config['digits']);
+              $userinput_row = $asterisk->get_data($this->config['file'],$this->config['timeout']*1000,$maxdigits);
               $userinput = $userinput_row['result'];
               $log->info("User input option: [{$userinput}] in the [$interaction] interaction.");
               $log->info("Result code [{$userinput_row['code']}] and status [{$userinput_row['data']}]");
               if(in_array($userinput, $digits)){
                 $log->info("Redirecting call to option $userinput");
+                $asterisk->exec_goto('default',$prefix . $userinput,1);
+                break;
+              }elseif ($this->config['allow_exten_dial'] == "true") {
+                $log->info("Redirecting call to Extension $userinput");
                 $asterisk->exec_goto('default',$prefix . $userinput,1);
                 break;
               }
