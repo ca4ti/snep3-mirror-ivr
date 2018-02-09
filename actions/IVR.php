@@ -192,7 +192,7 @@ XML;
           $interaction++;
           $userinput_row = $asterisk->get_data($this->config['file'],$this->config['timeout']*1000, $maxdigits);
           $userinput = $userinput_row['result'];
-          $asterisk->exec("Set","USERINPUT=$userinput");
+          $asterisk->exec("Set","__USERINPUT=$userinput");
           $input_count = strlen($userinput);
           $log->info("User inserted $input_count digits: [{$userinput}] in the [$interaction] interaction.");
           $log->debug("Result code [{$userinput_row['code']}] and status [{$userinput_row['data']}]");
